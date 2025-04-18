@@ -9,27 +9,23 @@ It creates three transactions:
 ## Prerequisites
 
 - Docker
+- Rust
 
 ## Running the script with docker
 
 ### Using Docker
 
 ```bash
-# Build the Docker image
-docker build -t bitcoin-transactions .
-
-# Run the demonstration
-docker run --rm bitcoin-transactions
-
-# Optionally, to keep the container running for inspection:
-docker run --rm bitcoin-transactions keep
+chmod +x init.sh
+./init.sh
 ```
 
 ## Running locally in linux
 If you prefer to run without Docker:
 
 1. Install Bitcoin Core
-2. Configure Bitcoin Core for regtest in the bitcoin.conf:
+2. Configure Bitcoin Core for regtest in the 
+bitcoin.conf:
 ```
 regtest=1
 txindex=1
@@ -38,8 +34,18 @@ rpcuser=bitcoinrpc
 rpcpassword=rpcpassword
 ```
 
-3. Start Bitcoin Core: bitcoind -daemon
-4. Install Rust and Cargo
-5. Build the application: cargo build --release
-6. Run the application: ./target/release/bitcoin-transactions
+3. Start Bitcoin Core: 
+```shell
+bitcoind -daemon
+```
+
+5. Build the application: 
+```shell
+cargo build --release
+```
+
+6. Run the application: 
+```shell
+./target/release/p2pool-test
+```
 
