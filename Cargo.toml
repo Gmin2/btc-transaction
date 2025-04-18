@@ -1,7 +1,7 @@
 [package]
 name = "p2pool-test"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 bitcoin = "0.32.5"

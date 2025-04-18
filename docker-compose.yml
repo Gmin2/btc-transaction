@@ -1,0 +1,36 @@
+version: '3'
+services:
+  bitcoin:
+    image: btcpayserver/bitcoin:24.0.1-1
+    container_name: bitcoin-node
+    command: >
+      bitcoind
+      -regtest=1
+      -server=1
+      -rpcuser=alice
+      -rpcpassword=password
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -txindex=1
+      -listen=1
+      -dnsseed=0
+      -upnp=0
+      -printtoconsole=0
+    ports:
+      - "18444:18443"
+    networks:
+      - bitcoin-network
+
+  rust-app:
+    build: .
+    container_name: bitcoin-transactions-app
+    depends_on:
+      - bitcoin
+    networks:
+      - bitcoin-network
+    environment:
+      - RUST_BACKTRACE=1
+
+networks:
+  bitcoin-network:
+    driver: bridge

@@ -3,20 +3,19 @@ use bitcoin::key::{PrivateKey, PublicKey, Secp256k1};
 use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
-use std::str::FromStr;
-use secp256k1::{SecretKey, rand};
-use std::{thread, time};
 use bitcoincore_rpc::{Auth, Client as RpcClient, RpcApi};
+use secp256k1::{rand, SecretKey};
+use std::str::FromStr;
+use std::{thread, time};
 
 fn main() {
-    // connect to bitcoin node 
-    let rpc_url = "http://localhost:18443";
-
+    // Connect to Bitcoin node
+    let rpc_url = "http://bitcoin:18443";
     let client = RpcClient::new(
         rpc_url,
         Auth::UserPass("alice".to_string(), "password".to_string()),
     )
-        .expect("Failed to create RPC client");
+    .expect("Failed to create RPC client");
 
     println!("Connected to Bitcoin node");
 
@@ -34,7 +33,6 @@ fn main() {
     let address = Address::p2pkh(&public_key, Network::Regtest);
     println!("Generated address: {}", address);
 
-
     // Ensure we have enough blocks to generate mature coins
     ensure_blocks_mined(&client).unwrap();
 
@@ -43,9 +41,13 @@ fn main() {
     println!("Mined block with coinbase txid: {}", coinbase_txid);
 
     // Mining 100 additional blocks to mature the coinbase
-    let temp_address = client.get_new_address(None, None).unwrap()
-                            .require_network(Network::Regtest).unwrap();
+    let temp_address = client
+        .get_new_address(None, None)
+        .unwrap()
+        .require_network(Network::Regtest)
+        .unwrap();
     client.generate_to_address(100, &temp_address).unwrap();
+    println!("Mined 100 blocks to mature the coinbase");
 
     // Wait for the block to be properly processed
     thread::sleep(time::Duration::from_secs(1));
@@ -58,6 +60,7 @@ fn main() {
 
     // Generate a block to confirm first transaction
     generate_block(&client).unwrap();
+    println!("Generated block to confirm first transaction");
 
     // Wait for block to be processed
     thread::sleep(time::Duration::from_secs(1));
@@ -72,43 +75,90 @@ fn main() {
     println!("Generated block to confirm second transaction");
 
     println!("Transaction chain complete!");
+    println!("Summary:");
+    println!("1. Coinbase transaction: {}", coinbase_txid);
+    println!("2. First transaction: {}", first_tx);
+    println!("3. Second transaction: {}", second_tx);
 }
 
+// fn initialize_wallet(client: &RpcClient) -> Result<(), bitcoincore_rpc::Error> {
+//     // Check if wallet is already loaded by listing wallets
+//     let wallets = client.list_wallets()?;
+
+//     if wallets.contains(&"mywallet".to_string()) {
+//         println!("Wallet 'mywallet' is already loaded");
+//         return Ok(());
+//     }
+
+//     // Try to load the wallet first
+//     match client.load_wallet("mywallet") {
+//         Ok(_) => {
+//             println!("Loaded existing wallet 'mywallet'");
+//             return Ok(());
+//         }
+//         Err(e) => {
+//             // If wallet doesn't exist, try to create it
+//             if e.to_string().contains("not found") {
+//                 match client.create_wallet("mywallet", None, None, None, None) {
+//                     Ok(_) => {
+//                         println!("Created new wallet 'mywallet'");
+//                         return Ok(());
+//                     }
+//                     Err(create_err) => {
+//                         println!("Error creating wallet: {:?}", create_err);
+//                         return Err(create_err);
+//                     }
+//                 }
+//             } else if e.to_string().contains("already loaded") {
+//                 // Wallet is already loaded
+//                 println!("Wallet 'mywallet' is already loaded");
+//                 return Ok(());
+//             } else {
+//                 // Some other error occurred
+//                 println!("Error loading wallet: {:?}", e);
+//                 return Err(e);
+//             }
+//         }
+//     }
+// }
+
 fn initialize_wallet(client: &RpcClient) -> Result<(), bitcoincore_rpc::Error> {
-    // Check if wallet is already loaded by listing wallets
-    let wallets = client.list_wallets()?;
+    println!("Initializing wallet...");
     
-    if wallets.contains(&"mywallet".to_string()) {
-        println!("Wallet 'mywallet' is already loaded");
-        return Ok(());
-    }
-    
-    // Try to load the wallet first
-    match client.load_wallet("mywallet") {
+    // Try to create the wallet first
+    match client.create_wallet("mywallet", None, None, None, None) {
         Ok(_) => {
-            println!("Loaded existing wallet 'mywallet'");
+            println!("Created new wallet 'mywallet'");
             return Ok(());
         },
         Err(e) => {
-            // If wallet doesn't exist, try to create it
-            if e.to_string().contains("not found") {
-                match client.create_wallet("mywallet", None, None, None, None) {
+            // If wallet already exists, try to load it
+            if e.to_string().contains("already exists") {
+                println!("Wallet 'mywallet' already exists, trying to load it");
+                match client.load_wallet("mywallet") {
                     Ok(_) => {
-                        println!("Created new wallet 'mywallet'");
+                        println!("Loaded existing wallet 'mywallet'");
                         return Ok(());
                     },
-                    Err(create_err) => {
-                        println!("Error creating wallet: {:?}", create_err);
-                        return Err(create_err);
+                    Err(load_err) => {
+                        // Check if wallet is already loaded
+                        if load_err.to_string().contains("already loaded") {
+                            println!("Wallet 'mywallet' is already loaded");
+                            return Ok(());
+                        } else {
+                            println!("Error loading wallet: {:?}", load_err);
+                            return Err(load_err);
+                        }
                     }
                 }
-            } else if e.to_string().contains("already loaded") {
-                // Wallet is already loaded
-                println!("Wallet 'mywallet' is already loaded");
-                return Ok(());
             } else {
-                // Some other error occurred
-                println!("Error loading wallet: {:?}", e);
+                println!("Error creating wallet: {:?}", e);
+                // Try to continue anyway, the wallet might be loadable
+                let wallets = client.list_wallets()?;
+                if wallets.contains(&"mywallet".to_string()) {
+                    println!("Wallet 'mywallet' is in the list of wallets");
+                    return Ok(());
+                }
                 return Err(e);
             }
         }
@@ -117,7 +167,7 @@ fn initialize_wallet(client: &RpcClient) -> Result<(), bitcoincore_rpc::Error> {
 
 fn ensure_blocks_mined(rpc: &RpcClient) -> Result<(), bitcoincore_rpc::Error> {
     let block_count = rpc.get_block_count()?;
-    
+
     if block_count < 101 {
         println!("Mining initial blocks to ensure we have mature coins...");
         // Get a new address for mining rewards
@@ -130,7 +180,7 @@ fn ensure_blocks_mined(rpc: &RpcClient) -> Result<(), bitcoincore_rpc::Error> {
     } else {
         println!("Already have {} blocks, no need to mine more", block_count);
     }
-    
+
     Ok(())
 }
 
